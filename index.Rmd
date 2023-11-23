@@ -1,0 +1,215 @@
+---
+title: "Stock Gains"
+output: 
+  flexdashboard::flex_dashboard:
+    logo: logga_rz.png
+    theme:
+      version: 4
+      bg: "#26272D"
+      fg: "#F7F7F7" 
+      primary: "#040926"
+      navbar-bg: "#3ADAC6"
+      base_font: 
+        google: Prompt
+      heading_font:
+        google: Sen
+      code_font:
+        google: 
+          # arguments to sass::font_google() 
+          family: JetBrains Mono
+          local: false
+    orientation: columns
+    vertical_layout: fill
+editor_options: 
+  chunk_output_type: console
+runtime: shiny
+---
+
+```{r global, include=FALSE}
+
+
+library(shiny)
+library(ggplot2)
+library(dplyr)
+library(plotly)
+# thematic::thematic_rmd(font = "auto")
+
+df<-jsalomon::getstk(sort(c("AAPL","MSFT","TSLA","NVDA","AMZN","PLTR","GOOGL","SPY","SMCI","IWM","IWO","QQQ","QQQE")), start_date = "2023-01-01")
+
+plotly_bg_color<-"#30343D"#464D5A"
+plot_text_color<-"grey80"
+
+
+theme_plotly<- theme(legend.position = "none",
+           plot.background = element_rect(fill = plotly_bg_color, colour = "white"),
+           panel.background = element_rect(fill = plotly_bg_color, colour = "white", size=2),
+           panel.grid.major.x = element_line(linewidth = 1.5, color="grey75"),
+           panel.grid.major.y = element_line(linewidth = 1.5, color="grey75"),
+           text = element_text(color=plot_text_color),
+           axis.text.x = element_text(color=plot_text_color),
+           axis.text.y = element_text(color=plot_text_color)
+           )
+
+
+
+
+```
+
+
+
+```{r setup, include = FALSE, context = "server"}
+#bslib::bs_themer()
+
+
+```
+
+
+
+
+Sidebar {.sidebar data-width=320}
+============================================================
+
+Select stocks you want to compare gains since a certain base time
+
+```{r}
+sliderInput("basedate", "Base Date", min = min(df$date), max = max(df$date), value = min(df$date), timeFormat = "%Y-%m-%d")
+
+selectInput("selectedStocks", "Select Stocks", choices = unique(df$symbol), multiple = TRUE,selected = "AAPL")
+
+# selectInput("n_breaks", label = "Number of bins:",
+#             choices = c(10, 20, 35, 50), selected = 20)
+# 
+# sliderInput("bw_adjust", label = "Bandwidth adjustment:",
+#             min = 0.2, max = 2, value = 1, step = 0.2)
+
+```
+
+
+
+
+Long Tab 1 {data-navmenu="Project Sections"}
+============================================================
+
+
+
+Column
+-----------------------------------------------------------------------
+
+
+
+### Price Gains
+
+```{r}
+
+renderPlotly({
+    filtered_data <- df %>%
+      filter(symbol %in% input$selectedStocks,
+             date >= input$basedate
+            
+      ) %>%
+      group_by(symbol) %>% 
+      mutate(close = ((close /first(close)  )-1)*100)  %>% 
+      ungroup()  
+
+    
+   p<-ggplot(filtered_data, aes(x = date, y = close, text=paste0(symbol, "\nGain: ",round(close,1),"%\n",date
+                                                                  
+                                                                   ) )) +
+      geom_line(aes(  group=symbol, color=symbol)) +
+      labs(x = "", 
+           y = paste("Percentage Gain Since", input$basedate),
+           color="",
+           title = "Stock Gains") +
+     scale_y_continuous( labels = scales::dollar_format(prefix = "", suffix = "%" ))+
+     jsalomon::scale_color_salo()+
+      theme_minimal()+
+     theme_plotly+
+     theme(legend.position = "above")
+    
+   
+   ggplotly(p, tooltip = "text")%>% plotly::config(displayModeBar = F)
+   
+    })
+
+```
+
+
+
+### Volume
+
+```{r}
+
+renderPlotly({
+    filtered_data <- df %>%
+      filter(symbol %in% input$selectedStocks
+             
+            
+      ) %>%
+      group_by(symbol) %>% 
+      mutate(dollarvol_20d = TTR::runMean(close*volume, n=20 ) )  %>% 
+      ungroup() |> 
+      filter(date >= input$basedate)
+
+    
+   p<-ggplot(filtered_data, aes(x = date, y = dollarvol_20d, text=paste0(symbol, "\n$Vol: ",round(dollarvol_20d/1000000,1), "M\n",date
+                                                                  
+                                                                   ) )) +
+      geom_line(aes(  group=symbol, color=symbol)) +
+      labs(x = "", 
+           y = paste("Dollar Volume from", input$basedate),
+           title = "20 Days Dollar Volume") +
+     scale_y_log10(labels = scales::dollar_format())+
+     jsalomon::scale_color_salo()+
+      theme_minimal()+
+     theme_plotly
+   
+   ggplotly(p, tooltip = "text")%>% plotly::config(displayModeBar = F)
+   
+    })
+
+```
+
+```{r, eval=FALSE}
+mainPanel(tags$footer( HTML("<footer><small><b>&copy; Johan Salomonsson.</b></small></footer>"), align="left", style="position:absolute; bottom:0; width:95%; height:100px; color: #000000; padding: 0px; background-color: transparent; z-index: 1000;"))
+```
+
+
+Long Tab 2 {data-navmenu="Project Sections"}
+============================================================
+
+Column
+-----------------------------------------------------------------------
+
+### Price Gains
+
+```{r}
+
+renderPlotly({
+    filtered_data <- df %>%
+      filter(symbol %in% input$selectedStocks,
+             date >= input$basedate
+            
+      ) %>%
+      group_by(symbol) %>% 
+      mutate(close = ((close /first(close)  )-1)*100)  %>% 
+      ungroup()  
+
+    
+   p<-ggplot(filtered_data, aes(x = date, y = close, text=paste0(symbol, "\nGain: ",round(close,1),"%"
+                                                                  
+                                                                   ) )) +
+      geom_line(aes(  group=symbol, color=symbol)) +
+      labs(x = "", 
+           y = paste("Percentage Gain Since", input$basedate),
+           title = "Stock Prices") +
+      theme_minimal()+
+     theme(legend.position = "none")
+   
+   ggplotly(p, tooltip = "text")%>% plotly::config(displayModeBar = F)
+   
+    })
+
+
+```
+
+
